@@ -1,11 +1,12 @@
 package ru.practicum.shareit.item.service;
 
-import jakarta.validation.ValidationException;
+import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.validation.annotation.Validated;
 import ru.practicum.shareit.exceptions.NotFoundException;
 import ru.practicum.shareit.item.dto.ItemDto;
 import ru.practicum.shareit.item.model.Item;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@Validated
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class ItemServiceImpl implements ItemService {
@@ -27,9 +29,8 @@ public class ItemServiceImpl implements ItemService {
     ItemRepo itemRepository;
 
     @Override
-    public ItemDto createItem(ItemDto itemDto, long userId) {
+    public ItemDto createItem(@Valid ItemDto itemDto, long userId) {
         log.info("Creating item {} for user {}", itemDto, userId);
-        validateItemForCreate(itemDto);
         validateUserExists(userId);
 
         Item item = ItemMapper.fromDto(itemDto, userId);
@@ -45,7 +46,7 @@ public class ItemServiceImpl implements ItemService {
                 .orElseThrow(() -> new NotFoundException("Item with id %s not found".formatted(itemId)));
 
         if (existedItem.getOwnerId() == null || existedItem.getOwnerId() != userId) {
-            throw new NotFoundException("Item with id %s not found".formatted(itemId));
+            throw new NotFoundException("Owner with id %s not found on item, or it is not equal to userId".formatted(itemId));
         }
 
         if (itemDto.getName() != null && !itemDto.getName().isBlank()) {
@@ -93,18 +94,6 @@ public class ItemServiceImpl implements ItemService {
                 .stream()
                 .map(ItemMapper::toDto)
                 .collect(Collectors.toList());
-    }
-
-    private void validateItemForCreate(ItemDto itemDto) {
-        if (itemDto.getName() == null || itemDto.getName().isBlank()) {
-            throw new ValidationException("Item name must not be blank");
-        }
-        if (itemDto.getDescription() == null || itemDto.getDescription().isBlank()) {
-            throw new ValidationException("Item description must not be blank");
-        }
-        if (itemDto.getAvailable() == null) {
-            throw new ValidationException("Item availability must be specified");
-        }
     }
 
     private void validateUserExists(long userId) {

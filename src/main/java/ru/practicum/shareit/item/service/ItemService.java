@@ -1,12 +1,13 @@
 package ru.practicum.shareit.item.service;
 
+import jakarta.validation.Valid;
 import ru.practicum.shareit.item.dto.ItemDto;
 
 import java.util.Collection;
 
 public interface ItemService {
 
-    ItemDto createItem(ItemDto item, long userId);
+    ItemDto createItem(@Valid ItemDto itemDto, long userId);
 
     ItemDto updateItem(long itemId, ItemDto item, long userId);
 
