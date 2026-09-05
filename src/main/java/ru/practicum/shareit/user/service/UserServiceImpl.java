@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import ru.practicum.shareit.exceptions.NotFoundException;
 import ru.practicum.shareit.exceptions.UserExistsException;
@@ -28,16 +29,20 @@ public class UserServiceImpl implements UserService {
     public UserDto createUser(UserDto userDto) {
         log.info("Creating user {}", userDto);
         validateUserForCreate(userDto);
-        validateEmailUniqueness(userDto.getEmail());
+        this.validateUserForCreate(userDto);
 
-        User stored = this.userRepository.create(UserMapper.fromDto(userDto));
-        return UserMapper.toDto(stored);
+        User user = UserMapper.fromDto(userDto);
+        try {
+            return UserMapper.toDto(this.userRepository.save(user));
+        } catch (DataIntegrityViolationException e) {
+            throw new UserExistsException("User with this email already exists");
+        }
     }
 
     @Override
     public UserDto updateUser(long userId, UserDto dto) {
         log.info("Updating user {} with {}", userId, dto);
-        User existingUser = userRepository.getById(userId)
+        User existingUser = this.userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User with id %s not found".formatted(userId)));
 
         if (dto.getName() != null) {
@@ -51,31 +56,34 @@ public class UserServiceImpl implements UserService {
             if (dto.getEmail().isBlank()) {
                 throw new ValidationException("Email must not be blank");
             }
-            validateEmailUniqueness(dto.getEmail());
             existingUser.setEmail(dto.getEmail());
         }
 
-        return UserMapper.toDto(userRepository.update(existingUser));
+        try {
+            return UserMapper.toDto(this.userRepository.save(existingUser));
+        } catch (DataIntegrityViolationException e) {
+            throw new UserExistsException("User with this email already exists");
+        }
     }
 
     @Override
     public Collection<UserDto> getUsers() {
         log.info("Getting all users");
-        return userRepository.getAll()
+        return userRepository.findAll()
                 .stream().map(UserMapper::toDto).collect(Collectors.toList());
     }
 
     @Override
     public UserDto getUserById(long userId) {
         log.info("Getting user by id {}", userId);
-        return this.userRepository.getById(userId)
+        return this.userRepository.findById(userId)
                 .map(UserMapper::toDto)
                 .orElseThrow(() -> new NotFoundException("User with id %s not found".formatted(userId)));
     }
 
     @Override
     public void deleteUserById(long userId) {
-        if (this.userRepository.getById(userId).isEmpty())
+        if (this.userRepository.findById(userId).isEmpty())
             throw new NotFoundException("User with id %s not found".formatted(userId));
         log.info("Deleting user by id {}", userId);
         this.userRepository.deleteById(userId);
@@ -88,12 +96,6 @@ public class UserServiceImpl implements UserService {
         if (userDto.getName() == null || userDto.getName().isBlank()) {
             throw new ValidationException("Name must not be blank");
         }
-    }
-
-    private void validateEmailUniqueness(String email) {
-        userRepository.getByEmail(email).ifPresent(user -> {
-            throw new UserExistsException("User with email %s exists".formatted(email));
-        });
     }
 
 }
