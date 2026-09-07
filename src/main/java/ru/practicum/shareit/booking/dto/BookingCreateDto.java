@@ -18,6 +18,7 @@ public class BookingCreateDto {
     @NotNull
     @FutureOrPresent
     LocalDateTime start;
+    @NotNull
     @Future
     LocalDateTime end;
 }
